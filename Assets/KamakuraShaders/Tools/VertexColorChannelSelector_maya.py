@@ -132,7 +132,13 @@ class VertexColorChannelSelector(object):
 		cmds.setParent('..')
 		cmds.rowLayout(numberOfColumns=2, columnWidth2=(WINDOW_WIDTH - 30, 30))
 		cmds.text(getLabel(EXPORT_NOTE2_HANDLE), e=True, align="left", label="Paint Vertex Color Tool", font="tinyBoldLabelFont")
-		cmds.text(getLabel(VERSION_LABEL_HANDLE), e=True, align="right", label="v" + __version__, font="tinyBoldLabelFont")
+		cmds.text(
+			getLabel(VERSION_LABEL_HANDLE),
+			e=True,
+			align="right",
+			label=f"v{__version__}",
+			font="tinyBoldLabelFont",
+		)
 		cmds.setParent('..')
 		cmds.showWindow(window)
 
@@ -154,7 +160,9 @@ class VertexColorChannelSelector(object):
 			buttonId = self.getButton(button)
 			splitIndex = len(buttonId) - buttonId.rfind('|')
 			buttonChannel = buttonId[1-splitIndex:]
-			cmds.button(buttonId, e=True, enable=not validChannel or not buttonChannel == channel)
+			cmds.button(
+				buttonId, e=True, enable=not validChannel or buttonChannel != channel
+			)
 
 	def updateUi(self):
 		getLabel = self.getLabel
@@ -175,17 +183,44 @@ class VertexColorChannelSelector(object):
 		selectedObjects = getSelectionsString()
 		selectedMeshCount = getSelectedMeshCount()
 
-		cmds.text(getLabel(CHANNEL_LABEL_HANDLE), e=True, label="Channel: "+selectedChannel, font="boldLabelFont")
+		cmds.text(
+			getLabel(CHANNEL_LABEL_HANDLE),
+			e=True,
+			label=f"Channel: {selectedChannel}",
+			font="boldLabelFont",
+		)
 		cmds.text(getLabel(SELECTION_LABEL_HANDLE), e=True, label=selectedObjects)
 
 		validChannel = len(selectionChannels) == 1
-		hasSelectedObject = selectedObjects != None and selectedObjects != "None"
+		hasSelectedObject = selectedObjects not in [None, "None"]
 		cmds.button(getButton(COMBINE_ONLY_BUTTON_HANDLE), e=True, enable=hasSelectedObject)
 		cmds.button(getButton(COMBINE_SWITCH_BUTTON_HANDLE), e=True, enable=hasSelectedObject)
-		cmds.button(getButton(IMPORT_BUTTON_HANDLE), e=True, label="Import Texture" + ( " (" + selectedChannel + ")" if validChannel else ""), enable=hasSelectedObject and selectedMeshCount == 1 and validChannel)
-		cmds.button(getButton(EXPORT_BUTTON_HANDLE), e=True, label="Export Texture" + ( " (" + selectedChannel + ")" if validChannel else ""), enable=hasSelectedObject and validChannel)
-		cmds.button(getButton(RESET_BUTTON_HANDLE), e=True, label="Clear color" + ( " (" + selectedChannel + ")" if validChannel else ""), enable=hasSelectedObject and validChannel)
-		cmds.button(getButton(FILL_BUTTON_HANDLE), e=True, label="Fill color" + ( " (" + selectedChannel + ")" if validChannel else ""), enable=hasSelectedObject and validChannel)
+		cmds.button(
+			getButton(IMPORT_BUTTON_HANDLE),
+			e=True,
+			label="Import Texture"
+			+ (f" ({selectedChannel})" if validChannel else ""),
+			enable=hasSelectedObject and selectedMeshCount == 1 and validChannel,
+		)
+		cmds.button(
+			getButton(EXPORT_BUTTON_HANDLE),
+			e=True,
+			label="Export Texture"
+			+ (f" ({selectedChannel})" if validChannel else ""),
+			enable=hasSelectedObject and validChannel,
+		)
+		cmds.button(
+			getButton(RESET_BUTTON_HANDLE),
+			e=True,
+			label="Clear color" + (f" ({selectedChannel})" if validChannel else ""),
+			enable=hasSelectedObject and validChannel,
+		)
+		cmds.button(
+			getButton(FILL_BUTTON_HANDLE),
+			e=True,
+			label="Fill color" + (f" ({selectedChannel})" if validChannel else ""),
+			enable=hasSelectedObject and validChannel,
+		)
 
 	def switchChannel(self, channel, *args):
 		if not isExistsColorSet(channel):
@@ -238,22 +273,18 @@ class VertexColorChannelSelector(object):
 def getSelectionsString():
 	selections = None
 	for item in getSelectionList():
-		if (selections == None):
-			selections = str(item)
-		else:
-			selections = selections + ", " + item
-
-	if (selections == None or len(selections) == 0):
+		selections = str(item) if selections is None else f"{selections}, {item}"
+	if selections is None or len(selections) == 0:
 		return "None"
 	elif (len(selections) > 40):
-		return selections[:40] + "..."
+		return f"{selections[:40]}..."
 	else:
 		return selections
 
 # Get selected object list
 def getSelectionList():
 	iter = om.MItSelectionList(om.MGlobal.getActiveSelectionList())
-	selections = list()
+	selections = []
 	while not iter.isDone():
 		selections.append(str(iter.getDagPath()))
 		iter.next()
@@ -270,11 +301,11 @@ def resetToColor(args):
 def fillColor(color, colorName):
 	validateChannels()
 	channel = getCurrentColorSetNames()[0]
-	colorName = COLOR_SET_NAMES[channel] if colorName == None else colorName
-	warnMessage = "Fill %s channel's color to %s?" % (channel, colorName)
+	colorName = COLOR_SET_NAMES[channel] if colorName is None else colorName
+	warnMessage = f"Fill {channel} channel's color to {colorName}?"
 	resetAll = channel == MAIN_COLOR_SET
 	if resetAll:
-		warnMessage = "Fill all channels color to %s?" % (colorName)
+		warnMessage = f"Fill all channels color to {colorName}?"
 
 	result = cmds.confirmDialog(
 		title='Warning',
@@ -310,16 +341,16 @@ def showPaintTool(args):
 # Open file dialog to import texture as vertex color
 def importTexture(args):
 	inFile = cmds.fileDialog2(fileFilter=FILE_FILTER, dialogStyle=2, fileMode=1)
-	if inFile == None or len(inFile) == 0:
+	if inFile is None or len(inFile) == 0:
 		return
 	inFile = str(inFile[0].encode('utf8'))
 	temp = inFile.split(".")
-	inFileType = temp[len(temp)-1]
+	inFileType = temp[-1]
 	loadTexture(inFile, inFileType)
 
 # Load texture and assign into vertex color
 def loadTexture(fileName, fileType):
-	if (fileName == None or len(fileName) == 0):
+	if fileName is None or len(fileName) == 0:
 		return
 	maya.mel.eval("PaintVertexColorTool;")
 	context = cmds.currentCtx()
@@ -337,9 +368,9 @@ def loadTexture(fileName, fileType):
 	# filter unused channel
 	for subColorSet in subColorSets:
 		mesh.setCurrentColorSetName(subColorSet)
-		useR = int(subColorSet == R_CHANNEL or subColorSet == MAIN_COLOR_SET)
-		useG = int(subColorSet == G_CHANNEL or subColorSet == MAIN_COLOR_SET)
-		useB = int(subColorSet == B_CHANNEL or subColorSet == MAIN_COLOR_SET)
+		useR = int(subColorSet in [R_CHANNEL, MAIN_COLOR_SET])
+		useG = int(subColorSet in [G_CHANNEL, MAIN_COLOR_SET])
+		useB = int(subColorSet in [B_CHANNEL, MAIN_COLOR_SET])
 		useA = int(subColorSet == A_CHANNEL)
 
 		numColors = len(colors)
@@ -356,11 +387,11 @@ def loadTexture(fileName, fileType):
 # Open file dialog to export vertex color as texture
 def exportTexture(args):
 	outFile = cmds.fileDialog2(fileFilter=FILE_FILTER, dialogStyle=2, fileMode=0)
-	if outFile == None or len(outFile) == 0:
+	if outFile is None or len(outFile) == 0:
 		return
 	outFile = str(outFile[0].encode('utf8'))
 	temp = outFile.split(".")
-	outFileType = temp[len(temp)-1]
+	outFileType = temp[-1]
 	if getSelectedMeshCount() > 1:
 		selectedChannel = getCurrentColorSetNames()[0]
 	else:
@@ -380,7 +411,7 @@ def validateChannels():
 	for mesh in getMeshIter():
 		currentColorSet = mesh.currentColorSetName()
 		colorSets = mesh.getColorSetNames()
-		if colorSets == None or not MAIN_COLOR_SET in colorSets:
+		if colorSets is None or MAIN_COLOR_SET not in colorSets:
 			mainColors = om.MColorArray(mesh.numVertices, om.MColor((1.0, 1.0, 1.0, 1.0)))
 			mesh.createColorSet(MAIN_COLOR_SET, True)
 			mesh.setColors(mainColors, MAIN_COLOR_SET)
@@ -391,14 +422,14 @@ def validateChannels():
 		mainColors = None
 
 		for subColorSet in SUB_COLOR_SETS:
-			if colorSets == None or not subColorSet in colorSets:
-				if mainColors == None:
+			if colorSets is None or subColorSet not in colorSets:
+				if mainColors is None:
 					mainColors = mesh.getVertexColors(MAIN_COLOR_SET)
 				numColors = len(mainColors)
 				mesh.createColorSet(subColorSet, True)
-				useR = int(subColorSet == R_CHANNEL or subColorSet == A_CHANNEL)
-				useG = int(subColorSet == G_CHANNEL or subColorSet == A_CHANNEL)
-				useB = int(subColorSet == B_CHANNEL or subColorSet == A_CHANNEL)
+				useR = int(subColorSet in [R_CHANNEL, A_CHANNEL])
+				useG = int(subColorSet in [G_CHANNEL, A_CHANNEL])
+				useB = int(subColorSet in [B_CHANNEL, A_CHANNEL])
 
 				subColors = om.MColorArray(numColors, om.MColor((1.0, 1.0, 1.0, 1.0)))
 				for i in xrange(numColors):
@@ -424,7 +455,7 @@ def validateChannels():
 			cmds.polyColorSet(rename=True, colorSet=MAIN_COLOR_SET, newColorSet=otherSet)
 			cmds.polyColorSet(rename=True, colorSet="__TEMP", newColorSet=MAIN_COLOR_SET)
 
-		if (currentColorSet == None or len(currentColorSet) == 0):
+		if currentColorSet is None or len(currentColorSet) == 0:
 			mesh.setCurrentColorSetName(R_CHANNEL)
 		else:
 			mesh.setCurrentColorSetName(currentColorSet)
@@ -452,9 +483,8 @@ def getMeshIter():
 		dagPath = iter.getDagPath()
 		dagPathStr = dagPath.fullPathName()
 		shapes = cmds.listRelatives(dagPathStr, shapes=True)
-		if (shapes == None or len(shapes) == 0) and dagPath.childCount() > 0:
-			for mesh in getMeshIterFromGroup(dagPath):
-				yield mesh
+		if (shapes is None or len(shapes) == 0) and dagPath.childCount() > 0:
+			yield from getMeshIterFromGroup(dagPath)
 		else:
 			dagPath.extendToShape()
 			mesh = om.MFnMesh(dagPath)
@@ -468,10 +498,7 @@ def getMesh():
 	return None
 
 def getSelectedMeshCount():
-	count = 0
-	for mesh in getMeshIter():
-		count += 1
-	return count
+	return sum(1 for _ in getMeshIter())
 
 def getMeshIterFromGroup(dagPath):
 	dagPathStr = dagPath.fullPathName()
@@ -482,9 +509,8 @@ def getMeshIterFromGroup(dagPath):
 			continue
 		childDag = om.MDagPath.getAPathTo(child)
 		shapes = cmds.listRelatives(childDag.fullPathName(), shapes=True)
-		if (shapes == None or len(shapes) == 0) and childDag.childCount() > 0:
-			for mesh in getMeshIterFromGroup(childDag):
-				yield mesh
+		if (shapes is None or len(shapes) == 0) and childDag.childCount() > 0:
+			yield from getMeshIterFromGroup(childDag)
 		else:
 			childDag.extendToShape()
 			mesh = om.MFnMesh(childDag)
@@ -494,9 +520,7 @@ def getMeshIterFromGroup(dagPath):
 
 def getCurrentColorSetNames():
 	iter = getMeshIter()
-	colorSetNames = set()
-	for mesh in iter:
-		colorSetNames.add(mesh.currentColorSetName())
+	colorSetNames = {mesh.currentColorSetName() for mesh in iter}
 	return list(colorSetNames)
 
 VertexColorChannelSelector()
